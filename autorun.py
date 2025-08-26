@@ -148,11 +148,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
     _required_framework_version = (2, 0, 0)
     @classmethod
     def get_requirements(cls):
-        return [requirements.TranslationLayerRequirement(name = 'primary',
-                                                        description = 'Memory layer for the kernel',
-                                                        architectures = ["Intel32", "Intel64"]),
-                requirements.SymbolTableRequirement(name = "nt_symbols",
-                                                    description = "Windows kernel symbols"),
+        return [
                 requirements.BooleanRequirement(name = 'verbose',
                                             description = "Is Verbose",
                                             default = False,
@@ -161,13 +157,12 @@ class Autoruns(interfaces.plugins.PluginInterface):
                                             element_type = str,
                                             description = "Test string list",
                                             optional = True),
-                requirements.PluginRequirement(name = 'pslist',plugin = pslist.PsList,version = (2, 0, 0)),
-                requirements.PluginRequirement(name = 'hivelist', plugin = hivelist.HiveList, version = (1, 0, 0)),
-                requirements.PluginRequirement(name = 'info', plugin = info.Info, version = (1, 0, 0)),
-                requirements.PluginRequirement(name = 'printkey', plugin = printkey.PrintKey, version = (1, 0, 0)),
-                requirements.PluginRequirement(name = 'dumpfiles', plugin = dumpfiles.DumpFiles, version = (1, 0, 0)),
-                requirements.PluginRequirement(name = 'poolscanner', plugin = poolscanner.PoolScanner, version = (1, 0, 0))
-                ]
+                requirements.ModuleRequirement(
+                                            name = 'kernel',
+                                            description = 'Windows kernel',
+                                            architectures = ["Intel32", "Intel64"]
+                                            ),
+ ]
 
     def dateString(self,key):
         return datetime.utcfromtimestamp((key.LastWriteTime.QuadPart - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS).isoformat(' ', 'seconds')
@@ -179,8 +174,9 @@ class Autoruns(interfaces.plugins.PluginInterface):
         parsed_tasks = []
 
         try:
-            constraints = poolscanner.PoolScanner.builtin_constraints(self.config['nt_symbols'], [b'Fil\xe5', b'File'])
-            for file in poolscanner.PoolScanner.generate_pool_scan(context = self.context,layer_name = self.config['primary'], symbol_table = self.config['nt_symbols'], constraints = constraints):
+            kernel = self.context.modules[self.config["kernel"]]
+            constraints = poolscanner.PoolScanner.builtin_constraints(kernel.symbol_table_name, [b'Fil\xe5', b'File'])
+            for file in poolscanner.PoolScanner.generate_pool_scan(context = self.context, kernel_module_name = self.config['kernel'] , constraints = constraints):
 
                 filename = str(file[1].file_name_with_device() or '')
 
@@ -189,7 +185,8 @@ class Autoruns(interfaces.plugins.PluginInterface):
                     vollog.debug("Found task: 0x{0:x} {1}".format(file[1].vol.offset,filename))
             for file, name in tasks:
                 try:
-                    for data in dumpfiles.DumpFiles.process_file_object(context = self.context, primary_layer_name = self.config['primary'], open_method = self.open, file_obj = file):
+                    kernel = self.context.modules[self.config["kernel"]]
+                    for data in dumpfiles.DumpFiles.process_file_object(context = self.context, primary_layer_name = kernel.layer_name, open_method = self.open, file_obj = file):
                         f = open(data[3], "br")
                         task_xml = f.read()
                         f.close()
@@ -266,8 +263,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
         try:
             hive = next(hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'))
             
@@ -322,8 +318,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
         try:
             hive = next(hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'))
 
@@ -361,8 +356,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
 
             hiveList = hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'system')
 
@@ -453,8 +447,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
         results = []
         for hive in hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'):
 
@@ -499,8 +492,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
 
         for hive in hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'):
 
@@ -553,8 +545,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
             # Gather all software run keys
             hive = next(hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'))
 
@@ -572,8 +563,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
             # Gather all ntuser run keys
             for hive in hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'ntuser.dat'):
 
@@ -614,8 +604,9 @@ class Autoruns(interfaces.plugins.PluginInterface):
         return results
 
     def peb_load_order_modules(self,peb):
+        kernel = self.context.modules[self.config["kernel"]]
         try:
-            for entry in peb.Ldr.InLoadOrderModuleList.to_list("{}{}_LDR_DATA_TABLE_ENTRY".format(self.config['nt_symbols'], constants.BANG),"InLoadOrderLinks"):
+            for entry in peb.Ldr.InLoadOrderModuleList.to_list("{}{}_LDR_DATA_TABLE_ENTRY".format(kernel.symbol_table_name, constants.BANG),"InLoadOrderLinks"):
                 yield entry
         except Exception as e:
                 vollog.debug('Exception: {0} {1}'.format(type(e).__name__, e.args))
@@ -623,10 +614,16 @@ class Autoruns(interfaces.plugins.PluginInterface):
 
     def get_dll_list(self):
         filter_func = pslist.PsList.create_pid_filter(self.config.get('pid', None))
-        task_objects = pslist.PsList.list_processes(self.context,
-                                                   self.config['primary'],
-                                                   self.config['nt_symbols'],
-                                                   filter_func = filter_func)
+        # Handle Volatility3 API differences across versions:
+        #   v2.26 (some builds): list_processes(context, layer_name, filter_func)
+        #   others:               list_processes(context, layer_name, symbol_table, filter_func)
+       
+    
+        task_objects = pslist.PsList.list_processes(
+                context=self.context,
+                kernel_module_name=self.config['kernel'],
+                filter_func = filter_func
+            )
         for task in task_objects:
             try:
                 peb = task.get_peb()
@@ -634,9 +631,6 @@ class Autoruns(interfaces.plugins.PluginInterface):
 
             except Exception as e:
                 vollog.debug('Exception: {0} {1}'.format(type(e).__name__, e.args))
-
-            #print(type(task))
-            #self.context.layers.del_layer(task)
 
     
     # Matches a given module (executable, DLL) to a running process by looking either
@@ -677,8 +671,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
         try:
             hive = next(hivelist.HiveList.list_hives(context = self.context,
                                                     base_config_path = self.config_path,
-                                                    layer_name = self.config['primary'],
-                                                    symbol_table = self.config['nt_symbols'],
+                                                    kernel_module_name = self.config['kernel'],
                                                     hive_offsets = None,
                                                     filter_string = 'software'))
 
@@ -707,8 +700,7 @@ class Autoruns(interfaces.plugins.PluginInterface):
                                                  
         for hive in hivelist.HiveList.list_hives(context = self.context,
                                                  base_config_path = self.config_path,
-                                                 layer_name = self.config['primary'],
-                                                 symbol_table = self.config['nt_symbols'],
+                                                 kernel_module_name = self.config['kernel'],
                                                  hive_offsets = None,
                                                  filter_string = '\\REGISTRY\\MACHINE\\SYSTEM'):
             
@@ -823,8 +815,11 @@ class Autoruns(interfaces.plugins.PluginInterface):
         self.activesetup = []
         self.sdb = []
 
+        kernel = self.context.modules[self.config["kernel"]]
+        kernel_layer = self.context.layers[kernel.layer_name]
+
         os_major = info.Info.get_ntheader_structure(context = self.context, 
-                                                    layer_name=self.config['primary'],
+                                                    layer_name=kernel.layer_name,
                                                     config_path = self.config_path).OptionalHeader.MajorOperatingSystemVersion
 
         asep_list = ['autoruns', 'services', 'appinit', 'winlogon', 'tasks', 'activesetup', 'sdb']
