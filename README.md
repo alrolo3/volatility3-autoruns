@@ -1,7 +1,19 @@
 # Volatility3 Autoruns plugin
-Port of tomchop's autoruns plugin for Volatility 3
+Modified of PXS-LU-CSIRT autoruns plugin for Volatility 3
 
 This plugin has been tested using tomchop's own test_data image and does match the expected output.
+
+## Changes
+
+change requeriments to new volatility version 2.26.0 and also all callings to self.context and config across all plugin.
+
+```
+requirements.ModuleRequirement(
+    name = 'kernel',
+    description = 'Windows kernel',
+    architectures = ["Intel32", "Intel64"]
+),
+```
 
 ## How-to
 
@@ -15,4 +27,4 @@ Here are the available options for this plugin:
 
 ## Special thanks
 
-Special thanks to tomchop for making the plugin available for the community.
+Special thanks to tomchop and PXS-LU-CSIRT for making the plugin available for the community.
